@@ -1,0 +1,6 @@
+numpy
+librosa
+matplotlib
+aubio
+praat-parselmouth
+crepe

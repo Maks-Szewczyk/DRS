@@ -1,7 +1,56 @@
 import aubio
 import librosa
 import numpy as np
-import statistics
+import json
+import logging
+import azure.functions as func
+
+app = func.FunctionApp()
+
+@app.function_name(name= "QueueOutput1")
+@app.route(route = "submit_note", methods = ["POST"]) #post method to submit a note to the queue.
+@app.queue_output(arg_name = "queue_msg",
+                  queue_name = "tuner_queue",
+                  connection = "CONNECTION_SETTING")
+def submit_tune_job(req: func.HttpRequest, queue_msg: func.Out[str]) -> func.HttpResponse:
+    logging.info("Recieved a job request")
+    #validation
+    try:
+        #requesting data for validation
+        data = req.get_json()
+        audio_file = data.get("audio_file")
+        desired_note = data.get("desired_note")
+
+        if not audio_file or not desired_note: #if either are empty, raise an error.
+            raise ValueError("Missing required fields: audio_file and desired_note must be provided.")
+
+    except ValueError:
+        return func.HttpResponse("Invalid data", status_code=400) #400 code = wont process the request
+
+    job_data = { #data to be sent to the queue.
+        "audio_file": audio_file,
+        "desired_note": desired_note
+    }
+
+    queue_msg.set(json.dumps(job_data))
+
+    return func.HttpResponse("Job submitted successfully", status_code=202) #202 code = job has been accepted for processing
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#FUNCTION 2
 # function will probably take the file and the chosen string to tune as input from trigger/queue. 
 input_file =  "input_songs/tuned_g_string.wav"
 src = aubio.source(input_file)
