@@ -20,22 +20,24 @@ def submit_tune_job(req: func.HttpRequest, queue_msg: func.Out[str]) -> func.Htt
         data = req.get_json()
         audio_file = data.get("audio_file")
         desired_note = data.get("desired_note")
+        processed = data.get("processed")
 
         if not audio_file or not desired_note: #if either are empty, raise an error.
             raise ValueError("Missing required fields: audio_file and desired_note must be provided.")
 
     except ValueError:
         return func.HttpResponse("Invalid data", status_code=400) #400 code = wont process the request
+    if processed == False: 
+        job_data = { #data to be sent to the queue.
+            "audio_file": audio_file,
+            "desired_note": desired_note,
+            "processed": processed
+        }
 
-    job_data = { #data to be sent to the queue.
-        "audio_file": audio_file,
-        "desired_note": desired_note
-    }
+        queue_msg.set(json.dumps(job_data))
 
-    queue_msg.set(json.dumps(job_data))
-
-    return func.HttpResponse("Job submitted successfully", status_code=202) #202 code = job has been accepted for processing
-
+        return func.HttpResponse("Job submitted successfully", status_code=202) #202 code = job has been accepted for processing
+    return func.HttpResponse("Job has already been processed", status_code=400) 
 
 
 
