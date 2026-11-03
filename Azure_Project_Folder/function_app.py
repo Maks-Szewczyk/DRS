@@ -16,7 +16,7 @@ from azure.core import MatchConditions
 app = func.FunctionApp()
 
 #job ID FUNCTION
-def job_id():
+def get_job_id():
     table = TableClient.from_connection_string(conn_str=os.environ["AzureWebJobsStorage"], table_name="Jobs")
     entity = table.get_entity("User", "Job")
     entity["job_id"] +=1
@@ -45,7 +45,7 @@ def submit_tune_job(req: func.HttpRequest, queue_msg: func.Out[str]) -> func.Htt
 
     except ValueError:
         return func.HttpResponse("Invalid data", status_code=400) #400 code = wont process the request
-    job_id = job_id()
+    job_id = get_job_id()
     job_data = { #data to be sent to the queue.
         "job_id": job_id,
         "audio_file": audio_file,
@@ -55,7 +55,7 @@ def submit_tune_job(req: func.HttpRequest, queue_msg: func.Out[str]) -> func.Htt
 
     queue_msg.set(json.dumps(job_data))
 
-    return func.HttpResponse("Job submitted successfully\n", status_code=202) #202 code = job has been accepted for processing
+    return func.HttpResponse(body = json.dumps({"job_id": job_id}), status_code=202, mimetype="application/json") #202 code = accepted for processing
 
 
 
@@ -133,11 +133,12 @@ def process_audio(queue_msg: func.QueueMessage) -> None:
     else:
         raise ValueError("No valid frequency values found in the audio file.")
     job_id = data["job_id"]
-    output_file = f"/tmp/shifted_string_{job_id}.wav"
+    output_file = f"/tmp/shifted_string.wav"
+    output_blob_name = f"shifted_string_{job_id}.wav"
     sf.write(output_file, y_shifted, sr)
     logging.info("Pitch shifting complete, saving output file")
     blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-    blob_client = blob_service_client.get_blob_client(container="processed-audio", blob=output_file)
+    blob_client = blob_service_client.get_blob_client(container="processed-audio", blob=output_blob_name)
     with open(output_file, "rb") as f:
         blob_client.upload_blob(f, overwrite=False)
     logging.info("Upload Successful")
